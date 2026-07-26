@@ -1,0 +1,30 @@
+# Atlas agent policy — HUMAN-OWNED. The agent may read this file, never write it.
+agent_name: Atlas
+version: 1.0
+
+budgets:
+  max_steps: 20
+  max_replans: 3
+  max_verify_retries: 2
+  max_seconds: 120
+
+# Hard allowlist. Tools not listed here do not exist.
+allowed_tools:
+  read_file:   { tier: safe }
+  write_file:  { tier: guarded }
+  list_dir:    { tier: safe }
+  run_python:  { tier: guarded, timeout_s: 30 }
+  web_search:  { tier: safe }
+  calculator:  { tier: safe }
+  web_fetch:   { tier: safe }
+  schedule_task: { tier: guarded }
+  book:        { tier: human }
+  computer_use: { tier: human }
+  verify:      { tier: safe }
+  finish:      { tier: safe, requires: verify_passed }
+
+paths:
+  workspace: workspace     # file tools are jailed to this dir
+  memory: memory
+  logs: logs
+  state: state

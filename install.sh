@@ -1,70 +1,43 @@
+
 #!/usr/bin/env bash
-# ============================================================================
-#  Nexus CLI — one-command installer  (macOS + Linux)
-#
-#  Installs the WHOLE Nexus agent (chat + autonomous /do crew + /cron
-#  scheduler + macOS computer-use) into ~/.nexus/agent and creates a global
-#  `nexus` command. Your API key is NEVER bundled — you paste it on first run
-#  and it's saved privately to ~/.nexus/config.json (chmod 600).
-#
-#  ONE-PASTE (from anywhere):
-#    curl -fsSL https://raw.githubusercontent.com/mokshasripadr-lab/nexus-ai-agent-CLI-mode-/main/install.sh | bash
-#
-#  Or run this file directly from the atlas-agent folder:  bash install.sh
-# ============================================================================
+# Nexus CLI installer  (macOS & Linux)
+# Installs the agent, makes a `nexus` command, and starts it.
+# Your API key is never included — you pick a model and paste your key on first run.
+
 set -e
 
-REPO_RAW="https://raw.githubusercontent.com/mokshasripadr-lab/nexus-ai-agent-CLI-mode-/main"
-DEST="$HOME/.nexus/agent"
+REPO="https://raw.githubusercontent.com/mokshasripadr-lab/nexus-ai-agent-CLI-mode-/main"
+AGENT="$HOME/.nexus/agent"
 BIN="$HOME/.local/bin"
 
-# Every backend file the agent needs to run — but NOT .env / keys.
-FILES=(
-  nexus_cli.py agent.py tools.py subagents.py memory.py improve.py
-  run_scheduled.py approve.py look.py atlas_mode.py computer_use.py
-  config.yaml PRD.md README.md
-)
+FILES="nexus_cli.py agent.py tools.py subagents.py memory.py improve.py run_scheduled.py approve.py look.py atlas_mode.py computer_use.py config.yaml PRD.md README.md"
 
-echo ""
-echo "  ✦ Installing Nexus CLI → $DEST"
-mkdir -p "$DEST" "$BIN"
+echo "Installing Nexus CLI..."
+mkdir -p "$AGENT" "$BIN"
 
-# Are we running next to the source files? (local install) or piped? (download)
-SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || echo '')"
-LOCAL=0
-[ -n "$SRC_DIR" ] && [ -f "$SRC_DIR/nexus_cli.py" ] && LOCAL=1
-
-for f in "${FILES[@]}"; do
-  if [ "$LOCAL" = "1" ] && [ -f "$SRC_DIR/$f" ]; then
-    cp "$SRC_DIR/$f" "$DEST/$f"
+# Copy the files if you're running this from the folder, otherwise download them.
+HERE="$(cd "$(dirname "$0")" 2>/dev/null && pwd || true)"
+for f in $FILES; do
+  if [ -f "$HERE/$f" ]; then
+    cp "$HERE/$f" "$AGENT/$f"
   else
-    curl -fsSL "$REPO_RAW/$f" -o "$DEST/$f" 2>/dev/null || echo "    (skipped $f — not in repo)"
+    curl -fsSL "$REPO/$f" -o "$AGENT/$f"
   fi
 done
 
-# Never carry over secrets.
-rm -f "$DEST/.env" 2>/dev/null || true
-
-# Create the global `nexus` launcher.
-cat > "$BIN/nexus" <<EOF
-#!/usr/bin/env bash
-exec /usr/bin/env python3 "$DEST/nexus_cli.py" "\$@"
-EOF
+# Make the `nexus` command.
+echo '#!/usr/bin/env bash'                         >  "$BIN/nexus"
+echo "exec python3 \"$AGENT/nexus_cli.py\" \"\$@\"" >> "$BIN/nexus"
 chmod +x "$BIN/nexus"
 
-# Put ~/.local/bin on PATH for both zsh and bash, once.
-for RC in "$HOME/.zshrc" "$HOME/.bashrc"; do
-  [ -f "$RC" ] || touch "$RC"
-  grep -q 'HOME/.local/bin' "$RC" 2>/dev/null || echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$RC"
-done
-export PATH="$HOME/.local/bin:$PATH"
-
-# Optional: macOS computer-use extras (safe to skip / fail).
-if [ "$(uname)" = "Darwin" ]; then
-  python3 -m pip install --quiet --user pyobjc pynput >/dev/null 2>&1 || true
-fi
+# Remember `nexus` for future terminals.
+grep -q '.local/bin' "$HOME/.zshrc"  2>/dev/null || echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.zshrc"
+grep -q '.local/bin' "$HOME/.bashrc" 2>/dev/null || echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
 
 echo ""
-echo "  ✅ Installed!  Starting Nexus now — pick a model and paste your key."
+echo "Installed! Starting Nexus now."
+echo "Next time, just type:  nexus"
 echo ""
-exec "$BIN/nexus"
+
+# Start it, reading your keyboard from the terminal (works even via curl | bash).
+python3 "$AGENT/nexus_cli.py" < /dev/tty

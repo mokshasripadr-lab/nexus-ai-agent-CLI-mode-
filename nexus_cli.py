@@ -33,6 +33,7 @@ PROVIDERS = {
     "3": {"id": "openai",    "name": "OpenAI GPT-4o",       "model": "gpt-4o",
           "hint": "sk-…  ·  platform.openai.com"},
 }
+PROVIDERS_BY_ID = {p["id"]: p["name"] for p in PROVIDERS.values()}
 
 
 def load_config() -> dict:
@@ -138,6 +139,28 @@ def engine_menu():
         current["key"] = choice
     name = ENGINES[current["key"]][0]
     print(f"{C.green}→ using {name}{C.r}\n")
+
+
+def model_menu() -> list[str]:
+    """Pick your LLM the same way you pick an engine. Returns the key list."""
+    cfg = load_config()
+    cur = cfg.get("provider", "google")
+    print(f"{C.cream}{C.b}Pick a model:{C.r}")
+    for k, p in PROVIDERS.items():
+        mark = f"{C.orange}●{C.r}" if p["id"] == cur else f"{C.dim}○{C.r}"
+        print(f"  {mark} {C.b}{k}{C.r}  {p['name']} {C.grey}— {p['hint']}{C.r}")
+    choice = input(f"{C.orange}choose 1-3 (Enter = keep) ›{C.r} ").strip()
+    if choice in PROVIDERS:
+        prov = PROVIDERS[choice]
+        # If we're switching providers, ask for that provider's key.
+        if prov["id"] != cur or not cfg.get("keys"):
+            key = input(f"{C.orange}Paste your {prov['name']} API key ›{C.r} ").strip()
+            if key:
+                cfg = {"provider": prov["id"], "model": prov["model"], "keys": [key]}
+                save_config(cfg)
+    name = PROVIDERS_BY_ID.get(cfg.get("provider", "google"), "your model")
+    print(f"{C.green}→ using {name}{C.r}\n")
+    return list(cfg.get("keys", []))
 
 
 # ---- Actions: open apps / sites from the CLI -------------------------------
@@ -372,9 +395,9 @@ Also: 'open email', 'open docs', 'search <thing>' work directly."""
 
 def chat_loop():
     banner()
-    keys = load_keys()
+    keys = model_menu()            # pick your LLM (like picking an engine)
     if not keys:
-        keys = first_run_setup()   # portable: prompts + saves to ~/.nexus
+        keys = load_keys()         # fall back to any saved/env key
     engine_menu()                  # show engines, pick one
     history: list[dict] = []
     while True:
@@ -402,7 +425,9 @@ def chat_loop():
                 print(f"{C.green}Key added — {len(keys)} loaded.{C.r}\n")
             continue
         if user == "/model":
-            keys = first_run_setup(); history.clear(); continue
+            nk = model_menu()
+            if nk: keys = nk
+            history.clear(); continue
         if user == "/engine":
             engine_menu(); history.clear(); continue
         if user.lower().startswith("/do "):
